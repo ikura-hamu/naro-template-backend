@@ -28,14 +28,18 @@ func main() {
 
 	fmt.Println("conntected")
 
-	var cities []City
-	err = db.Select(&cities, "SELECT * FROM city WHERE CountryCode = 'JPN'") //?を使わない場合、第3引数以降は不要
+	newCity := City{
+		Name:        "Oookayama",
+		CountryCode: "JPN",
+		District:    "Tokyo-to",
+		Population:  5000,
+	}
+	result, err := db.Exec("INSERT INTO city (Name, CountryCode, District, Population) VALUES (?,?,?,?)", newCity.Name, newCity.CountryCode, newCity.District, newCity.Population)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("日本の都市一覧")
-	for _, city := range cities {
-		fmt.Printf("都市名: %s, 人口: %d\n", city.Name, city.Population)
-	}
+	id, _ :=  result.LastInsertId()
+
+	fmt.Printf("%sのIDは%d\n", newCity.Name, id)
 }
