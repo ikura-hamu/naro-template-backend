@@ -120,7 +120,7 @@ func loginHandler(c echo.Context) error {
 func getCountryListHandler(c echo.Context) error {
 	var countryList []CountryList
 	err := db.Select(&countryList, "SELECT Code, Name FROM country")
-	if (err != nil) {
+	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -132,7 +132,7 @@ func getCityListHandler(c echo.Context) error {
 	countryCode := c.Param("countryCode")
 	var cityList []CityList
 	err := db.Select(&cityList, "SELECT Name FROM city WHERE CountryCode=?", countryCode)
-	if (err != nil) {
+	if err != nil {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
@@ -178,4 +178,19 @@ func getWhoAmIHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, Me{
 		Username: c.Get("userName").(string),
 	})
+}
+
+func calculatePopulation(cities []City) map[string]int64 {
+	populationMap := make(map[string]int64)
+	for _, city := range cities {
+		if !city.CountryCode.Valid {
+			continue
+		}
+		if _, ok := populationMap[city.CountryCode.String]; !ok {
+			populationMap[city.CountryCode.String] = 0
+		}
+		populationMap[city.CountryCode.String] += city.Population.Int64
+	}
+
+	return populationMap
 }
