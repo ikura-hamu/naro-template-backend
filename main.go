@@ -1,76 +1,99 @@
 package main
 
 import (
-	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/srinathgs/mysqlstore"
 )
 
-type City struct {
-	ID          int    `json:"id,omitempty"  db:"ID"`
-	Name        string `json:"name,omitempty"  db:"Name"`
-	CountryCode string `json:"countryCode,omitempty"  db:"CountryCode"`
-	District    string `json:"district,omitempty"  db:"District"`
-	Population  int    `json:"population,omitempty"  db:"Population"`
-}
-
 var (
-	db *sqlx.DB
+	db   *sqlx.DB
+	salt = ""
 )
 
 func main() {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=True&loc=Asia%%2FTokyo&charset=utf8mb4",
-		os.Getenv("DB_USERNAME"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOSTNAME"), os.Getenv("DB_PORT"), os.Getenv("DB_DATABASE"))
-	_db, err := sqlx.Open("mysql", dsn)
+	jst, err := time.LoadLocation("Asia/Tokyo")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("conntected")
+
+	conf := mysql.Config{
+		User:      os.Getenv("DB_USERNAME"),
+		Passwd:    os.Getenv("DB_PASSWORD"),
+		Net:       "tcp",
+		Addr:      os.Getenv("DB_HOSTNAME") + ":" + os.Getenv("DB_PORT"),
+		DBName:    os.Getenv("DB_DATABASE"),
+		ParseTime: true,
+		Collation: "utf8mb4_unicode_ci",
+		Loc:       jst,
+	}
+
+	salt = os.Getenv("HASH_SALT")
+
+	_db, err := sqlx.Open("mysql", conf.FormatDSN())
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	db = _db
 
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS users (Username VARCHAR(255) PRIMARY KEY, HashedPass VARCHAR(255))")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	store, err := mysqlstore.NewMySQLStoreFromConnection(db.DB, "sessions", "/", 60*60*24*14, []byte("secret-token"))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(session.Middleware(store))
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"http://localhost:5173"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost},
+	}))
 
-	e.GET("/cities/:cityName", getCityInfoHandler)
-	e.POST("/cities", postCityHandler)
+	e.POST("/login", loginHandler)
+	e.POST("/signup", signUpHandler)
+	e.GET("/ping", func(c echo.Context) error { return c.String(http.StatusOK, "pong") })
 
-	e.Start(":3000")
+	withAuth := e.Group("")
+	withAuth.Use(userAuthMiddleware)
+	withAuth.GET("/cities/:cityName", getCityInfoHandler)
+	withAuth.POST("/cities", postCityHandler)
+	withAuth.GET("/whoami", getWhoAmIHandler)
+	withAuth.GET("/countrylist", getCountryListHandler)
+	withAuth.GET("/country/:countryCode", getCityListHandler)
+
+	e.Start(":8080")
 }
 
-func getCityInfoHandler(c echo.Context) error {
-	cityName := c.Param("cityName")
-	fmt.Println(cityName)
+func userAuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		sess, err := session.Get("sessions", c)
+		if err != nil {
+			fmt.Println(err)
+			return c.String(http.StatusInternalServerError, "something wrong in getting session")
+		}
+		if sess.Values["userName"] == nil {
+			return c.String(http.StatusUnauthorized, "please login")
+		}
+		c.Set("userName", sess.Values["userName"].(string))
 
-	var city City
-	if err := db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName); errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("No such city Name = %s", cityName))
-	} else if err != nil {
-		log.Fatalf("failed to get city: %s", err)
+		return next(c)
 	}
-
-	return c.JSON(http.StatusOK, city)
-}
-
-func postCityHandler(c echo.Context) error {
-	var city City
-	err := c.Bind(&city)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "bad request body")
-	}
-
-	result, err := db.Exec("INSERT INTO city (Name, CountryCode, District, Population) VALUES (?, ?, ?, ?)", city.Name, city.CountryCode, city.District, city.Population)
-	if err != nil {
-		log.Fatalf("failed to insert city data: %s", err)
-	}
-
-	id, _ := result.LastInsertId()
-	city.ID = int(id)
-
-	return c.JSON(http.StatusCreated, city)
 }
