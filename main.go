@@ -1,76 +1,79 @@
 package main
 
 import (
-	"database/sql"
-	"errors"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/jmoiron/sqlx"
+	"github.com/labstack/echo-contrib/session"
 	"github.com/labstack/echo/v4"
-)
+	"github.com/labstack/echo/v4/middleware"
+	"github.com/srinathgs/mysqlstore"
+	"github.com/traPtitech/naro-template-backend/handler"
 
-type City struct {
-	ID          int    `json:"id,omitempty"  db:"ID"`
-	Name        string `json:"name,omitempty"  db:"Name"`
-	CountryCode string `json:"countryCode,omitempty"  db:"CountryCode"`
-	District    string `json:"district,omitempty"  db:"District"`
-	Population  int    `json:"population,omitempty"  db:"Population"`
-}
+	"github.com/go-sql-driver/mysql"
 
-var (
-	db *sqlx.DB
+	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=True&loc=Asia%%2FTokyo&charset=utf8mb4",
-		os.Getenv("DB_USERNAME"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_HOSTNAME"), os.Getenv("DB_PORT"), os.Getenv("DB_DATABASE"))
-	_db, err := sqlx.Open("mysql", dsn)
+	// .envファイルから環境変数を読み込み
+	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("conntected")
-	db = _db
 
+	// データーベースの設定
+	jst, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		log.Fatal(err)
+	}
+	conf := mysql.Config{
+		User:      os.Getenv("DB_USERNAME"),
+		Passwd:    os.Getenv("DB_PASSWORD"),
+		Net:       "tcp",
+		Addr:      os.Getenv("DB_HOSTNAME") + ":" + os.Getenv("DB_PORT"),
+		DBName:    os.Getenv("DB_DATABASE"),
+		ParseTime: true,
+		Collation: "utf8mb4_unicode_ci",
+		Loc:       jst,
+	}
+
+	// データベースに接続
+	db, err := sqlx.Open("mysql", conf.FormatDSN())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// usersテーブルが存在しなかったら、usersテーブルを作成する
+	_, err = db.Exec("CREATE TABLE IF NOT EXISTS users (Username VARCHAR(255) PRIMARY KEY, HashedPass VARCHAR(255))")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// セッションの情報を記憶するための場所をデータベース上に設定
+	store, err := mysqlstore.NewMySQLStoreFromConnection(db.DB, "sessions", "/", 60*60*24*14, []byte("secret-token"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	h := handler.NewHandler(db)
 	e := echo.New()
+	e.Use(middleware.Logger())       // ログを取るミドルウェアを追加
+	e.Use(session.Middleware(store)) // セッション管理のためのミドルウェアを追加
 
-	e.GET("/cities/:cityName", getCityInfoHandler)
-	e.POST("/cities", postCityHandler)
+	e.POST("/signup", h.SignUpHandler)
+	e.POST("/login", h.LoginHandler)
 
-	e.Start(":3000")
-}
+	withAuth := e.Group("")
+	withAuth.Use(handler.UserAuthMiddleware)
+	withAuth.GET("/me", handler.GetMeHandler)
+	withAuth.GET("/cities/:cityName", h.GetCityInfoHandler)
+	withAuth.POST("/cities", h.PostCityHandler)
 
-func getCityInfoHandler(c echo.Context) error {
-	cityName := c.Param("cityName")
-	fmt.Println(cityName)
-
-	var city City
-	if err := db.Get(&city, "SELECT * FROM city WHERE Name=?", cityName); errors.Is(err, sql.ErrNoRows) {
-		return echo.NewHTTPError(http.StatusNotFound, fmt.Sprintf("No such city Name = %s", cityName))
-	} else if err != nil {
-		log.Fatalf("failed to get city: %s", err)
-	}
-
-	return c.JSON(http.StatusOK, city)
-}
-
-func postCityHandler(c echo.Context) error {
-	var city City
-	err := c.Bind(&city)
+	err = e.Start(":8080")
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, "bad request body")
+		log.Fatal(err)
 	}
-
-	result, err := db.Exec("INSERT INTO city (Name, CountryCode, District, Population) VALUES (?, ?, ?, ?)", city.Name, city.CountryCode, city.District, city.Population)
-	if err != nil {
-		log.Fatalf("failed to insert city data: %s", err)
-	}
-
-	id, _ := result.LastInsertId()
-	city.ID = int(id)
-
-	return c.JSON(http.StatusCreated, city)
 }
