@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/jmoiron/sqlx v1.3.5
-	github.com/joho/godotenv v1.5.1
 	github.com/labstack/echo-contrib v0.15.0
 	github.com/labstack/echo/v4 v4.10.2
 	github.com/srinathgs/mysqlstore v0.0.0-20231123182912-ffbca72c0a70
