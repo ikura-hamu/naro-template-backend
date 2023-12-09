@@ -1,7 +1,6 @@
 package main
 
 import (
-	_ "embed"
 	"log"
 	"os"
 	"time"
@@ -17,8 +16,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-//go:embed sql/world.sql
-var worldDBQuery string
+// go:embed sql/world.sql
+// var worldDBQuery string
 
 func main() {
 	// データーベースの設定
@@ -43,10 +42,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_, err = db.Exec(worldDBQuery)
-	if err != nil {
-		log.Fatalf("failed to create world database: %v", err)
-	}
+	// _, err = db.Exec(worldDBQuery)
+	// if err != nil {
+	// 	log.Fatalf("failed to create world database: %v", err)
+	// }
 
 	// usersテーブルが存在しなかったら、usersテーブルを作成する
 	_, err = db.Exec("CREATE TABLE IF NOT EXISTS users (Username VARCHAR(255) PRIMARY KEY, HashedPass VARCHAR(255))")
