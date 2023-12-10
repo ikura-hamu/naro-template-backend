@@ -156,6 +156,14 @@ func GetMeHandler(c echo.Context) error {
 	})
 }
 
+type cityResponse struct {
+	ID          int    `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	CountryCode string `json:"countryCode,omitempty"`
+	District    string `json:"district,omitempty"`
+	Population  int64  `json:"population,omitempty"`
+}
+
 func (h *Handler) GetCityInfoHandler(c echo.Context) error {
 	cityName := c.Param("cityName")
 
@@ -169,7 +177,13 @@ func (h *Handler) GetCityInfoHandler(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, city)
+	return c.JSON(http.StatusOK, cityResponse{
+		ID:          city.ID,
+		Name:        city.Name.String,
+		CountryCode: city.CountryCode.String,
+		District:    city.District.String,
+		Population:  city.Population.Int64,
+	})
 }
 
 func (h *Handler) PostCityHandler(c echo.Context) error {
@@ -203,13 +217,6 @@ func (h *Handler) GetCitiesHandler(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	type cityResponse struct {
-		ID          int    `json:"id,omitempty"`
-		Name        string `json:"name,omitempty"`
-		CountryCode string `json:"countryCode,omitempty"`
-		District    string `json:"district,omitempty"`
-		Population  int64  `json:"population,omitempty"`
-	}
 	citiesResponse := make([]cityResponse, 0, len(cities))
 	for _, city := range cities {
 		citiesResponse = append(citiesResponse, cityResponse{
