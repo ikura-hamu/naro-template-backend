@@ -135,18 +135,19 @@ func (h *Handler) LoginHandler(c echo.Context) error {
 }
 
 func UserAuthMiddleware(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		sess, err := session.Get("sessions", c)
-		if err != nil {
-			log.Println(err)
-			return c.String(http.StatusInternalServerError, "something wrong in getting session")
-		}
-		if sess.Values["userName"] == nil {
-			return c.String(http.StatusUnauthorized, "please login")
-		}
-		c.Set("userName", sess.Values["userName"].(string))
-		return next(c)
-	}
+	// return func(c echo.Context) error {
+	// 	sess, err := session.Get("sessions", c)
+	// 	if err != nil {
+	// 		log.Println(err)
+	// 		return c.String(http.StatusInternalServerError, "something wrong in getting session")
+	// 	}
+	// 	if sess.Values["userName"] == nil {
+	// 		return c.String(http.StatusUnauthorized, "please login")
+	// 	}
+	// 	c.Set("userName", sess.Values["userName"].(string))
+	// 	return next(c)
+	// }
+	return func(c echo.Context) error { return next(c) }
 }
 
 func GetMeHandler(c echo.Context) error {
