@@ -202,5 +202,22 @@ func (h *Handler) GetCitiesHandler(c echo.Context) error {
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
-	return c.JSON(http.StatusOK, cities)
+	type cityResponse struct {
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		CountryCode string `json:"countryCode,omitempty"`
+		District    string `json:"district,omitempty"`
+		Population  int64  `json:"population,omitempty"`
+	}
+	citiesResponse := make([]cityResponse, 0, len(cities))
+	for _, city := range cities {
+		citiesResponse = append(citiesResponse, cityResponse{
+			ID:          city.ID,
+			Name:        city.Name.String,
+			CountryCode: city.CountryCode.String,
+			District:    city.District.String,
+			Population:  city.Population.Int64,
+		})
+	}
+	return c.JSON(http.StatusOK, citiesResponse)
 }
