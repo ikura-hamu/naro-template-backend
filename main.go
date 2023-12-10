@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -26,14 +27,14 @@ func main() {
 		log.Fatal(err)
 	}
 	conf := mysql.Config{
-		User:      os.Getenv("NS_MARIADB_USER"),
-		Passwd:    os.Getenv("NS_MARIADB_PASSWORD"),
-		Net:       "tcp",
-		Addr:      os.Getenv("NS_MARIADB_HOSTNAME") + ":" + os.Getenv("NS_MARIADB_PORT"),
-		DBName:    os.Getenv("NS_MARIADB_DATABASE"),
-		ParseTime: true,
-		Collation: "utf8mb4_unicode_ci",
-		Loc:       jst,
+		User:                 os.Getenv("NS_MARIADB_USER"),
+		Passwd:               os.Getenv("NS_MARIADB_PASSWORD"),
+		Net:                  "tcp",
+		Addr:                 os.Getenv("NS_MARIADB_HOSTNAME") + ":" + os.Getenv("NS_MARIADB_PORT"),
+		DBName:               os.Getenv("NS_MARIADB_DATABASE"),
+		ParseTime:            true,
+		Collation:            "utf8mb4_unicode_ci",
+		Loc:                  jst,
 		AllowNativePasswords: true,
 	}
 
@@ -64,6 +65,11 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.Logger())       // ログを取るミドルウェアを追加
 	e.Use(session.Middleware(store)) // セッション管理のためのミドルウェアを追加
+
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{http.MethodGet, http.MethodPost},
+	}))
 
 	e.POST("/signup", h.SignUpHandler)
 	e.POST("/login", h.LoginHandler)
