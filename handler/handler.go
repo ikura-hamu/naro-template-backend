@@ -193,3 +193,14 @@ func (h *Handler) PostCityHandler(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, city)
 }
+
+func (h *Handler) GetCitiesHandler(c echo.Context) error {
+	var cities []City
+	err := h.db.Select(&cities, "SELECT * FROM city ORDER BY Name")
+	if err != nil {
+		log.Printf("failed to get cities: %v\n", err)
+		return c.NoContent(http.StatusInternalServerError)
+	}
+
+	return c.JSON(http.StatusOK, cities)
+}

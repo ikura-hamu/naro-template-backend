@@ -78,6 +78,7 @@ func main() {
 	withAuth := e.Group("")
 	withAuth.Use(handler.UserAuthMiddleware)
 	withAuth.GET("/me", handler.GetMeHandler)
+	withAuth.GET("/cities", h.GetCitiesHandler)
 	withAuth.GET("/cities/:cityName", h.GetCityInfoHandler)
 	withAuth.POST("/cities", h.PostCityHandler)
 
