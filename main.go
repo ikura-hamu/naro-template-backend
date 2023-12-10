@@ -67,8 +67,9 @@ func main() {
 	e.Use(session.Middleware(store)) // セッション管理のためのミドルウェアを追加
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{http.MethodGet, http.MethodPost},
+		AllowOrigins:     []string{"http://*", "https://"},
+		AllowMethods:     []string{http.MethodGet, http.MethodPost},
+		AllowCredentials: true,
 	}))
 
 	e.POST("/signup", h.SignUpHandler)
