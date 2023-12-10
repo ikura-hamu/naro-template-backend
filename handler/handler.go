@@ -128,6 +128,7 @@ func (h *Handler) LoginHandler(c echo.Context) error {
 	}
 	sess.Values["userName"] = req.Username
 	sess.Options.SameSite = http.SameSiteNoneMode
+	sess.Options.Secure = true
 	sess.Save(c.Request(), c.Response())
 
 	return c.NoContent(http.StatusOK)
