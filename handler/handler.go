@@ -127,6 +127,7 @@ func (h *Handler) LoginHandler(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, "something wrong in getting session")
 	}
 	sess.Values["userName"] = req.Username
+	sess.Options.SameSite = http.SameSiteNoneMode
 	sess.Save(c.Request(), c.Response())
 
 	return c.NoContent(http.StatusOK)
